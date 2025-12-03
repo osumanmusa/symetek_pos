@@ -8,6 +8,12 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\InventoryTransactionController;
+use App\Http\Controllers\InventoryDashboardController;
+use App\Http\Controllers\InventoryLevelController;
+
+use App\Http\Controllers\WarehouseController;
+
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DashboardController;
@@ -74,39 +80,73 @@ Route::prefix('products')->name('products.')->group(function () {
 // });    // Or if you want specific routes:
     
     Route::prefix('inventory')->name('inventory.')->group(function () {
-        Route::get('/', function () {
-            return inertia('Inventory/Index');
-        })->name('index');
+        // Route::get('/', function () {
+        //     return inertia('Inventory/index');
+        // })->name('index');
         Route::get('/adjust', function () {
             return inertia('Inventory/Adjust');
         })->name('adjust');
     });
         // Purchase Orders
-    
+       Route::get('/inventory', [InventoryDashboardController::class, 'index'])->name('inventory.index');
+           Route::prefix('inventory-transactions')->name('inventory.transactions.')->group(function () {
+        Route::get('/', [InventoryTransactionController::class, 'index'])->name('index');
+        Route::get('/create', [InventoryTransactionController::class, 'create'])->name('create');
+        Route::post('/', [InventoryTransactionController::class, 'store'])->name('store');
+        Route::get('/{transaction}', [InventoryTransactionController::class, 'show'])->name('show');
+    });
     // Purchase Orders
     Route::resource('purchase-orders', PurchaseOrderController::class);
-      
-   Route::post('/purchase-orders/{purchaseOrder}/order', [PurchaseOrderController::class, 'markAsOrdered'])
-        ->name('purchase-orders.order');
+        // Purchase Orders
+    Route::get('/purchase-orders/export', [PurchaseOrderController::class, 'export'])->name('purchase-orders.export');
+    Route::resource('purchase-orders', PurchaseOrderController::class);
     
-    Route::post('/purchase-orders/{purchaseOrder}/approve-and-order', [PurchaseOrderController::class, 'approveAndOrder'])
-        ->name('purchase-orders.approve-and-order');
+    // Purchase Order Additional Routes
+    Route::prefix('purchase-orders')->name('purchase-orders.')->group(function () {    
+        Route::get('/{purchaseOrder}/print', [PurchaseOrderController::class, 'print'])->name('print');
+    Route::get('/export', [PurchaseOrderController::class, 'export'])->name('export');
+        // Route::get('/{purchaseOrder}/print', [PurchaseOrderController::class, 'print'])->name('print');
+        Route::post('/{purchaseOrder}/approve', [PurchaseOrderController::class, 'approve'])->name('approve');
+        Route::post('/{purchaseOrder}/order', [PurchaseOrderController::class, 'markAsOrdered'])->name('order');
+        Route::post('/{purchaseOrder}/approve-and-order', [PurchaseOrderController::class, 'approveAndOrder'])->name('approve-and-order');
+        Route::post('/{purchaseOrder}/receive-full', [PurchaseOrderController::class, 'markAsFullyReceived'])->name('receive-full');
+        Route::post('/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->name('cancel');
+        Route::get('/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])->name('receive');
+        Route::post('/{purchaseOrder}/process-receive', [PurchaseOrderController::class, 'processReceive'])->name('process-receive');
+        Route::post('/{purchaseOrder}/update-payment', [PurchaseOrderController::class, 'updatePayment'])->name('update-payment');
+        Route::post('/{purchaseOrder}/mark-paid', [PurchaseOrderController::class, 'markAsPaid'])->name('mark-paid');
+    });
+    // In routes/web.php
+Route::get('/export-purchase-orders', [PurchaseOrderController::class, 'export'])
+    ->name('export.purchase-orders'); // Simpler name
+//    Route::post('/purchase-orders/{purchaseOrder}/order', [PurchaseOrderController::class, 'markAsOrdered'])
+//         ->name('purchase-orders.order');
     
-    Route::post('/purchase-orders/{purchaseOrder}/receive-full', [PurchaseOrderController::class, 'markAsReceived'])
-        ->name('purchase-orders.receive-full');
+   // Warehouse Routes
+    Route::resource('warehouses', WarehouseController::class)->except(['show']);
     
-    Route::get('/purchase-orders/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])
-        ->name('purchase-orders.receive');
+    // Inventory Transactions
+    Route::resource('inventory.transactions', InventoryTransactionController::class)->except(['edit', 'update']);
+    Route::get('inventory/transactions/{transaction}', [InventoryTransactionController::class, 'show'])->name('inventory.transactions.show');
+    Route::get('products/{product}/stock', [InventoryTransactionController::class, 'getProductStock'])->name('products.stock');
+        Route::get('products/{product}/inventory', [ProductController::class, 'inventory'])->name('products.inventory');
+    Route::get('products/stock-report', [ProductController::class, 'stockReport'])->name('products.stock-report');
+
+    // Stock Levels
+    Route::get('inventory/levels', [InventoryLevelController::class, 'index'])->name('inventory.levels.index');
+    Route::get('inventory/levels/{warehouse?}', [InventoryLevelController::class, 'warehouseStock'])->name('inventory.levels.warehouse');
     
-    Route::post('/purchase-orders/{purchaseOrder}/process-receive', [PurchaseOrderController::class, 'processReceive'])
-        ->name('purchase-orders.process-receive');
+    // Stock Transfer
+    Route::get('inventory/transfer/create', [InventoryTransactionController::class, 'createTransfer'])->name('inventory.transfer.create');
+    Route::post('inventory/transfer', [InventoryTransactionController::class, 'transfer'])->name('inventory.transfer.store');
     
-    Route::post('/purchase-orders/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])
-        ->name('purchase-orders.cancel');
+    // Stock Adjustment
+    Route::get('inventory/adjustment/create', [InventoryTransactionController::class, 'createAdjustment'])->name('inventory.adjustment.create');
+    Route::post('inventory/adjustment', [InventoryTransactionController::class, 'adjust'])->name('inventory.adjustment.store');
     // Additional PO routes
-    Route::post('/purchase-orders/{purchaseOrder}/approve', [PurchaseOrderController::class, 'approve'])->name('purchase-orders.approve');
+    // Route::post('/purchase-orders/{purchaseOrder}/approve', [PurchaseOrderController::class, 'approve'])->name('purchase-orders.approve');
     Route::post('/purchase-orders/{purchaseOrder}/mark-ordered', [PurchaseOrderController::class, 'markAsOrdered'])->name('purchase-orders.mark-ordered');
-    Route::post('/purchase-orders/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->name('purchase-orders.cancel');
+    // Route::post('/purchase-orders/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->name('purchase-orders.cancel');
     
     // Receiving routes
     Route::get('/purchase-orders/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])->name('purchase-orders.receive');

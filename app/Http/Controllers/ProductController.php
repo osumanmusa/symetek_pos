@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use App\Models\Category;
+use App\Models\InventoryLevel;
+use App\Models\Warehouse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -89,6 +91,48 @@ class ProductController extends Controller
             ->with('success', 'Product deleted successfully.');
     }
 
+
+    public function inventory(Product $product)
+{
+    $product->load(['inventoryLevels.warehouse', 'inventoryTransactions' => function ($query) {
+        $query->latest()->limit(50);
+    }]);
+    
+    return Inertia::render('Products/Inventory', [
+        'product' => $product,
+        'warehouses' => Warehouse::active()->get(),
+    ]);
+}
+
+/**
+ * Get product stock across warehouses
+ */
+public function stockReport(Request $request)
+{
+    $products = Product::with(['inventoryLevels.warehouse'])
+        ->when($request->input('search'), function ($query, $search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('sku', 'like', "%{$search}%")
+                  ->orWhere('barcode', 'like', "%{$search}%");
+            });
+        })
+        ->when($request->input('category_id'), function ($query, $categoryId) {
+            $query->where('category_id', $categoryId);
+        })
+        ->when($request->input('low_stock'), function ($query) {
+            $query->whereHas('inventoryLevels', function ($q) {
+                $q->whereRaw('quantity_on_hand - quantity_committed <= low_stock_threshold');
+            });
+        })
+        ->paginate(25);
+        
+    return Inertia::render('Products/StockReport', [
+        'products' => $products,
+        'filters' => $request->only(['search', 'category_id', 'low_stock']),
+        'categories' => Category::all(),
+    ]);
+}
     /**
      * Search products for POS
      */

@@ -23,6 +23,7 @@
     "dependencies": {
         "@ericblade/quagga2": "^1.11.0",
         "@heroicons/vue": "^2.2.0",
+        "html2pdf.js": "^0.12.1",
         "instascan": "^1.0.0"
     }
 }
