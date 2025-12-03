@@ -1,24 +1,24 @@
 
 <template>
-  <AppLayout title="Inventory Transactions">
+  <AppLayout title="Stock Report">
     <template #header>
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 class="text-2xl font-bold text-gray-800">
-            Inventory Transactions
+            Stock Report
           </h2>
           <p class="mt-1 text-sm text-gray-600">
-            Track all inventory movements and adjustments
+            Comprehensive view of all product stock levels
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
-          <SecondaryButton @click="exportData" :disabled="exporting">
+          <SecondaryButton @click="exportReport" :disabled="exporting">
             <ArrowDownTrayIcon class="h-4 w-4 mr-2" />
-            {{ exporting ? 'Exporting...' : 'Export' }}
+            {{ exporting ? 'Exporting...' : 'Export CSV' }}
           </SecondaryButton>
-          <PrimaryButton @click="createTransaction">
-            <PlusIcon class="h-4 w-4 mr-2" />
-            New Transaction
+          <PrimaryButton @click="showFilters = !showFilters">
+            <FunnelIcon class="h-4 w-4 mr-2" />
+            {{ showFilters ? 'Hide Filters' : 'Show Filters' }}
           </PrimaryButton>
         </div>
       </div>
@@ -27,27 +27,16 @@
     <div class="py-6">
       <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
         <!-- Filters Card -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+        <div v-show="showFilters" class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
           <div class="p-4 border-b border-gray-200">
-            <div class="flex items-center justify-between">
-              <h3 class="text-lg font-medium text-gray-900">Filters</h3>
-              <button
-                @click="showFilters = !showFilters"
-                class="text-sm text-gray-600 hover:text-gray-900 flex items-center"
-              >
-                <FunnelIcon class="h-4 w-4 mr-1" />
-                {{ showFilters ? 'Hide Filters' : 'Show Filters' }}
-              </button>
-            </div>
+            <h3 class="text-lg font-medium text-gray-900">Filter Products</h3>
           </div>
-          
-          <!-- Filter Form -->
-          <div v-show="showFilters" class="p-4 border-b border-gray-200">
+          <div class="p-6">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <!-- Search -->
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">
-                  Search
+                  Search Products
                 </label>
                 <div class="relative">
                   <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -56,66 +45,61 @@
                   <input
                     v-model="filters.search"
                     type="text"
-                    placeholder="Product, SKU, Reference..."
+                    placeholder="Name, SKU, Barcode..."
                     class="pl-10 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                     @keyup.enter="applyFilters"
                   />
                 </div>
               </div>
 
-              <!-- Transaction Type -->
+              <!-- Category -->
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">
-                  Transaction Type
+                  Category
                 </label>
                 <select
-                  v-model="filters.transaction_type"
+                  v-model="filters.category_id"
                   class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   @change="applyFilters"
                 >
-                  <option value="">All Types</option>
-                  <option v-for="(label, value) in transactionTypes" :key="value" :value="value">
-                    {{ label }}
+                  <option value="">All Categories</option>
+                  <option v-for="category in categories" :key="category.id" :value="category.id">
+                    {{ category.name }}
                   </option>
                 </select>
               </div>
 
-              <!-- Warehouse -->
+              <!-- Stock Status -->
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">
-                  Warehouse
+                  Stock Status
                 </label>
                 <select
-                  v-model="filters.warehouse_id"
+                  v-model="filters.stock_status"
                   class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   @change="applyFilters"
                 >
-                  <option value="">All Warehouses</option>
-                  <option v-for="warehouse in warehouses" :key="warehouse.id" :value="warehouse.id">
-                    {{ warehouse.name }}
-                  </option>
+                  <option value="">All Status</option>
+                  <option value="in_stock">In Stock</option>
+                  <option value="low_stock">Low Stock</option>
+                  <option value="out_of_stock">Out of Stock</option>
                 </select>
               </div>
 
-              <!-- Date Range -->
+              <!-- Product Status -->
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">
-                  Date Range
+                  Product Status
                 </label>
-                <div class="flex space-x-2">
-                  <input
-                    v-model="filters.start_date"
-                    type="date"
-                    class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    @change="applyFilters"
-                  />
-                  <input
-                    v-model="filters.end_date"
-                    type="date"
-                    class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    @change="applyFilters"
-                  />
-                </div>
+                <select
+                  v-model="filters.product_status"
+                  class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  @change="applyFilters"
+                >
+                  <option value="">All Products</option>
+                  <option value="active">Active Only</option>
+                  <option value="inactive">Inactive Only</option>
+                </select>
               </div>
             </div>
 
@@ -125,22 +109,22 @@
                 @click="resetFilters"
                 class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
-                Clear All
+                Clear All Filters
               </button>
             </div>
           </div>
         </div>
 
-        <!-- Stats Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <!-- Summary Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
           <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div class="flex items-center">
               <div class="flex-shrink-0 bg-blue-100 rounded-md p-3">
-                <DocumentTextIcon class="h-6 w-6 text-blue-600" />
+                <CubeIcon class="h-6 w-6 text-blue-600" />
               </div>
               <div class="ml-4">
-                <p class="text-sm font-medium text-gray-600">Total Transactions</p>
-                <p class="text-2xl font-semibold text-gray-900">{{ stats.total_transactions || 0 }}</p>
+                <p class="text-sm font-medium text-gray-600">Total Products</p>
+                <p class="text-2xl font-semibold text-gray-900">{{ summary.total_products || 0 }}</p>
               </div>
             </div>
           </div>
@@ -148,11 +132,25 @@
           <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div class="flex items-center">
               <div class="flex-shrink-0 bg-green-100 rounded-md p-3">
-                <ArrowUpIcon class="h-6 w-6 text-green-600" />
+                <CheckCircleIcon class="h-6 w-6 text-green-600" />
               </div>
               <div class="ml-4">
-                <p class="text-sm font-medium text-gray-600">Stock In</p>
-                <p class="text-2xl font-semibold text-green-600">{{ stats.stock_in || 0 }}</p>
+                <p class="text-sm font-medium text-gray-600">In Stock</p>
+                <p class="text-2xl font-semibold text-gray-900">{{ summary.in_stock || 0 }}</p>
+                <p class="text-xs text-gray-500 mt-1">{{ summary.in_stock_percentage || 0 }}% of total</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div class="flex items-center">
+              <div class="flex-shrink-0 bg-yellow-100 rounded-md p-3">
+                <ExclamationTriangleIcon class="h-6 w-6 text-yellow-600" />
+              </div>
+              <div class="ml-4">
+                <p class="text-sm font-medium text-gray-600">Low Stock</p>
+                <p class="text-2xl font-semibold text-gray-900">{{ summary.low_stock || 0 }}</p>
+                <p class="text-xs text-gray-500 mt-1">Needs restocking</p>
               </div>
             </div>
           </div>
@@ -160,37 +158,26 @@
           <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div class="flex items-center">
               <div class="flex-shrink-0 bg-red-100 rounded-md p-3">
-                <ArrowDownIcon class="h-6 w-6 text-red-600" />
+                <XCircleIcon class="h-6 w-6 text-red-600" />
               </div>
               <div class="ml-4">
-                <p class="text-sm font-medium text-gray-600">Stock Out</p>
-                <p class="text-2xl font-semibold text-red-600">{{ stats.stock_out || 0 }}</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div class="flex items-center">
-              <div class="flex-shrink-0 bg-purple-100 rounded-md p-3">
-                <CurrencyDollarIcon class="h-6 w-6 text-purple-600" />
-              </div>
-              <div class="ml-4">
-                <p class="text-sm font-medium text-gray-600">Total Value</p>
-                <p class="text-2xl font-semibold text-gray-900">{{ formatCurrency(stats.total_value || 0) }}</p>
+                <p class="text-sm font-medium text-gray-600">Out of Stock</p>
+                <p class="text-2xl font-semibold text-gray-900">{{ summary.out_of_stock || 0 }}</p>
+                <p class="text-xs text-gray-500 mt-1">{{ summary.out_of_stock_percentage || 0 }}% of total</p>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Main Table Card -->
+        <!-- Main Report Table -->
         <div class="bg-white rounded-lg shadow-sm border border-gray-200">
           <div class="p-6">
             <!-- Table Header -->
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
               <div>
-                <h3 class="text-lg font-medium text-gray-900">Recent Transactions</h3>
+                <h3 class="text-lg font-medium text-gray-900">Product Stock Levels</h3>
                 <p class="text-sm text-gray-600">
-                  Showing {{ transactions.from || 0 }} to {{ transactions.to || 0 }} of {{ transactions.total || 0 }} transactions
+                  Showing {{ products.from || 0 }} to {{ products.to || 0 }} of {{ products.total || 0 }} products
                 </p>
               </div>
               
@@ -208,36 +195,31 @@
               </div>
             </div>
 
-            <!-- Transactions Table -->
+            <!-- Products Table -->
             <div class="overflow-x-auto">
               <table class="min-w-full divide-y divide-gray-200">
                 <thead>
                   <tr class="bg-gray-50">
                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      <div class="flex items-center">
-                        Date/Time
-                        <button @click="sortBy('transaction_date')" class="ml-1">
-                          <ChevronUpDownIcon class="h-4 w-4 text-gray-400" />
-                        </button>
-                      </div>
-                    </th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Type
-                    </th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Product
                     </th>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Quantity
+                      Category
                     </th>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Warehouse
+                      SKU
                     </th>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Value
+                      Total Stock
                     </th>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      User
+                      Available
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Low Stock Alert
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
                     </th>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
@@ -245,27 +227,7 @@
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
-                  <tr v-for="transaction in transactions.data" :key="transaction.id" class="hover:bg-gray-50">
-                    <!-- Date/Time -->
-                    <td class="px-6 py-4 whitespace-nowrap">
-                      <div class="text-sm text-gray-900">
-                        {{ formatDate(transaction.transaction_date) }}
-                      </div>
-                      <div class="text-xs text-gray-500">
-                        {{ formatTime(transaction.transaction_date) }}
-                      </div>
-                    </td>
-
-                    <!-- Transaction Type -->
-                    <td class="px-6 py-4 whitespace-nowrap">
-                      <span :class="getTransactionTypeBadgeClass(transaction.transaction_type)">
-                        {{ transactionTypes[transaction.transaction_type] || transaction.transaction_type }}
-                      </span>
-                      <div v-if="transaction.reference_number" class="text-xs text-gray-500 mt-1">
-                        {{ transaction.reference_number }}
-                      </div>
-                    </td>
-
+                  <tr v-for="product in products.data" :key="product.id" class="hover:bg-gray-50">
                     <!-- Product -->
                     <td class="px-6 py-4">
                       <div class="flex items-center">
@@ -274,54 +236,68 @@
                         </div>
                         <div class="ml-4">
                           <div class="text-sm font-medium text-gray-900">
-                            {{ transaction.product?.name || 'Unknown' }}
+                            {{ product.name }}
                           </div>
                           <div class="text-sm text-gray-500">
-                            {{ transaction.product?.sku || 'No SKU' }}
+                            {{ product.barcode || 'No barcode' }}
                           </div>
                         </div>
                       </div>
                     </td>
 
-                    <!-- Quantity -->
+                    <!-- Category -->
                     <td class="px-6 py-4 whitespace-nowrap">
-                      <div class="flex items-center">
-                        <div class="text-sm font-medium" :class="getQuantityTextClass(transaction)">
-                          {{ formatQuantity(transaction.quantity, transaction.transaction_type) }}
-                        </div>
-                        <div class="ml-2 text-sm text-gray-500">
-                          {{ transaction.product?.unit || 'units' }}
-                        </div>
+                      <div class="text-sm text-gray-900">
+                        {{ product.category?.name || 'Uncategorized' }}
                       </div>
                     </td>
 
-                    <!-- Warehouse -->
+                    <!-- SKU -->
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <div class="text-sm font-medium text-gray-900">
+                        {{ product.sku || 'N/A' }}
+                      </div>
+                    </td>
+
+                    <!-- Total Stock -->
                     <td class="px-6 py-4 whitespace-nowrap">
                       <div class="text-sm text-gray-900">
-                        {{ transaction.warehouse?.name || 'Default' }}
+                        {{ formatNumber(product.total_quantity || 0) }}
                       </div>
                       <div class="text-xs text-gray-500">
-                        {{ transaction.warehouse?.code || '' }}
+                        {{ product.unit || 'units' }}
                       </div>
                     </td>
 
-                    <!-- Value -->
+                    <!-- Available -->
                     <td class="px-6 py-4 whitespace-nowrap">
-                      <div v-if="transaction.total_cost" class="text-sm font-medium text-gray-900">
-                        {{ formatCurrency(transaction.total_cost) }}
+                      <div class="text-sm font-medium" :class="getStockLevelClass(product.total_available)">
+                        {{ formatNumber(product.total_available || 0) }}
                       </div>
-                      <div v-else class="text-sm text-gray-400">
-                        -
-                      </div>
-                      <div v-if="transaction.unit_cost" class="text-xs text-gray-500">
-                        @ {{ formatCurrency(transaction.unit_cost) }}
+                      <div v-if="product.inventory_levels?.length > 0" class="text-xs text-gray-500">
+                        Across {{ product.inventory_levels.length }} warehouse(s)
                       </div>
                     </td>
 
-                    <!-- User -->
+                    <!-- Low Stock Alert -->
                     <td class="px-6 py-4 whitespace-nowrap">
                       <div class="text-sm text-gray-900">
-                        {{ transaction.user?.name || 'System' }}
+                        {{ product.low_stock_threshold || 10 }}
+                      </div>
+                      <div class="text-xs text-gray-500">
+                        Alert level
+                      </div>
+                    </td>
+
+                    <!-- Status -->
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <div class="flex flex-col space-y-2">
+                        <span :class="getStockStatusBadgeClass(product)">
+                          {{ getStockStatusText(product) }}
+                        </span>
+                        <span :class="getProductStatusBadgeClass(product)">
+                          {{ product.is_active ? 'Active' : 'Inactive' }}
+                        </span>
                       </div>
                     </td>
 
@@ -329,19 +305,26 @@
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div class="flex items-center space-x-2">
                         <button
-                          @click="viewTransaction(transaction)"
+                          @click="viewProduct(product)"
                           class="text-indigo-600 hover:text-indigo-900"
                           title="View Details"
                         >
                           <EyeIcon class="h-5 w-5" />
                         </button>
                         <button
-                          v-if="transaction.notes"
-                          @click="showNotes(transaction)"
-                          class="text-gray-600 hover:text-gray-900"
-                          title="View Notes"
+                          @click="viewInventory(product)"
+                          class="text-blue-600 hover:text-blue-900"
+                          title="View Inventory"
                         >
-                          <DocumentTextIcon class="h-5 w-5" />
+                          <BuildingStorefrontIcon class="h-5 w-5" />
+                        </button>
+                        <button
+                          v-if="product.is_low_stock"
+                          @click="createReorder(product)"
+                          class="text-green-600 hover:text-green-900"
+                          title="Reorder"
+                        >
+                          <ShoppingCartIcon class="h-5 w-5" />
                         </button>
                       </div>
                     </td>
@@ -350,34 +333,34 @@
               </table>
 
               <!-- Empty State -->
-              <div v-if="transactions.data.length === 0" class="text-center py-12">
-                <DocumentTextIcon class="mx-auto h-12 w-12 text-gray-400" />
-                <h3 class="mt-2 text-sm font-medium text-gray-900">No transactions found</h3>
+              <div v-if="products.data.length === 0" class="text-center py-12">
+                <CubeIcon class="mx-auto h-12 w-12 text-gray-400" />
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No products found</h3>
                 <p class="mt-1 text-sm text-gray-500">
-                  {{ hasFilters ? 'Try changing your filters' : 'Get started by creating a new transaction' }}
+                  {{ hasFilters ? 'Try changing your filters' : 'No products in inventory' }}
                 </p>
                 <div v-if="!hasFilters" class="mt-6">
-                  <PrimaryButton @click="createTransaction">
+                  <PrimaryButton @click="router.visit(route('products.create'))">
                     <PlusIcon class="h-4 w-4 mr-2" />
-                    New Transaction
+                    Add Product
                   </PrimaryButton>
                 </div>
               </div>
             </div>
 
             <!-- Pagination -->
-            <div v-if="transactions.data.length > 0" class="flex items-center justify-between border-t border-gray-200 px-4 py-3 sm:px-6">
+            <div v-if="products.data.length > 0" class="flex items-center justify-between border-t border-gray-200 px-4 py-3 sm:px-6">
               <div class="flex flex-1 justify-between sm:hidden">
                 <button
-                  :disabled="!transactions.prev_page_url"
-                  @click="goToPage(transactions.current_page - 1)"
+                  :disabled="!products.prev_page_url"
+                  @click="goToPage(products.current_page - 1)"
                   class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Previous
                 </button>
                 <button
-                  :disabled="!transactions.next_page_url"
-                  @click="goToPage(transactions.current_page + 1)"
+                  :disabled="!products.next_page_url"
+                  @click="goToPage(products.current_page + 1)"
                   class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Next
@@ -386,16 +369,16 @@
               <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
                 <div>
                   <p class="text-sm text-gray-700">
-                    Showing <span class="font-medium">{{ transactions.from }}</span> to 
-                    <span class="font-medium">{{ transactions.to }}</span> of 
-                    <span class="font-medium">{{ transactions.total }}</span> results
+                    Showing <span class="font-medium">{{ products.from }}</span> to 
+                    <span class="font-medium">{{ products.to }}</span> of 
+                    <span class="font-medium">{{ products.total }}</span> results
                   </p>
                 </div>
                 <div>
                   <nav class="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
                     <button
-                      :disabled="!transactions.prev_page_url"
-                      @click="goToPage(transactions.current_page - 1)"
+                      :disabled="!products.prev_page_url"
+                      @click="goToPage(products.current_page - 1)"
                       class="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <span class="sr-only">Previous</span>
@@ -408,7 +391,7 @@
                       @click="goToPage(page)"
                       :class="[
                         'relative inline-flex items-center px-4 py-2 text-sm font-semibold',
-                        page === transactions.current_page
+                        page === products.current_page
                           ? 'z-10 bg-indigo-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600'
                           : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0'
                       ]"
@@ -417,8 +400,8 @@
                     </button>
                     
                     <button
-                      :disabled="!transactions.next_page_url"
-                      @click="goToPage(transactions.current_page + 1)"
+                      :disabled="!products.next_page_url"
+                      @click="goToPage(products.current_page + 1)"
                       class="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <span class="sr-only">Next</span>
@@ -430,30 +413,49 @@
             </div>
           </div>
         </div>
+
+        <!-- Low Stock Alert Section -->
+        <div v-if="lowStockProducts.length > 0" class="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+          <div class="flex items-center mb-4">
+            <ExclamationTriangleIcon class="h-6 w-6 text-yellow-600 mr-2" />
+            <h3 class="text-lg font-medium text-yellow-800">Low Stock Alerts</h3>
+          </div>
+          <p class="text-sm text-yellow-700 mb-4">
+            {{ lowStockProducts.length }} product(s) are below their low stock threshold and need reordering.
+          </p>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-yellow-200">
+              <thead>
+                <tr>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-yellow-800 uppercase">Product</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-yellow-800 uppercase">Available</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-yellow-800 uppercase">Threshold</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-yellow-800 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-yellow-100">
+                <tr v-for="product in lowStockProducts" :key="product.id">
+                  <td class="px-3 py-2 text-sm text-yellow-900">{{ product.name }}</td>
+                  <td class="px-3 py-2 text-sm font-medium text-yellow-900">
+                    {{ product.total_available }} {{ product.unit }}
+                  </td>
+                  <td class="px-3 py-2 text-sm text-yellow-900">{{ product.low_stock_threshold }} {{ product.unit }}</td>
+                  <td class="px-3 py-2 text-sm">
+                    <button
+                      @click="createReorder(product)"
+                      class="text-green-600 hover:text-green-900 flex items-center"
+                    >
+                      <ShoppingCartIcon class="h-4 w-4 mr-1" />
+                      Reorder
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
-
-    <!-- Notes Modal -->
-    <Modal :show="showNotesModal" @close="showNotesModal = false">
-      <div class="p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-medium text-gray-900">Transaction Notes</h3>
-          <button @click="showNotesModal = false" class="text-gray-400 hover:text-gray-500">
-            <XMarkIcon class="h-6 w-6" />
-          </button>
-        </div>
-        <div v-if="selectedTransaction" class="space-y-4">
-          <div class="bg-gray-50 p-4 rounded-md">
-            <p class="text-sm text-gray-900 whitespace-pre-wrap">
-              {{ selectedTransaction.notes }}
-            </p>
-          </div>
-          <div class="text-sm text-gray-500">
-            Added on {{ formatDate(selectedTransaction.created_at) }}
-          </div>
-        </div>
-      </div>
-    </Modal>
   </AppLayout>
 </template>
 
@@ -461,22 +463,20 @@
 import AppLayout from '@/Layouts/AppLayout.vue'
 import PrimaryButton from '@/Components/PrimaryButton.vue'
 import SecondaryButton from '@/Components/SecondaryButton.vue'
-import Modal from '@/Components/Modal.vue'
 import { 
-  PlusIcon,
-  MagnifyingGlassIcon,
+  ArrowDownTrayIcon,
   FunnelIcon,
-  DocumentTextIcon,
-  ArrowUpIcon,
-  ArrowDownIcon,
-  CurrencyDollarIcon,
+  MagnifyingGlassIcon,
+  CubeIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  XCircleIcon,
   EyeIcon,
-  ChevronUpDownIcon,
+  BuildingStorefrontIcon,
+  ShoppingCartIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  XMarkIcon,
-  ArrowDownTrayIcon,
-  CubeIcon
+  PlusIcon
 } from '@heroicons/vue/24/outline'
 import { ref, computed, watch } from 'vue'
 import { router } from '@inertiajs/vue3'
@@ -484,36 +484,34 @@ import debounce from 'lodash/debounce'
 import axios from 'axios'
 
 const props = defineProps({
-  transactions: Object,
-  transactionTypes: Object,
-  warehouses: Array,
+  products: Object,
+  categories: Array,
+  summary: Object,
   filters: Object,
-  stats: Object,
 })
 
 const showFilters = ref(false)
-const showNotesModal = ref(false)
-const selectedTransaction = ref(null)
 const exporting = ref(false)
-const perPage = ref(props.transactions.per_page || 25)
+const perPage = ref(props.products.per_page || 25)
 
 const filters = ref({
   search: props.filters.search || '',
-  transaction_type: props.filters.transaction_type || '',
-  warehouse_id: props.filters.warehouse_id || '',
-  start_date: props.filters.start_date || '',
-  end_date: props.filters.end_date || '',
-  sort_by: props.filters.sort_by || 'transaction_date',
-  sort_order: props.filters.sort_order || 'desc',
+  category_id: props.filters.category_id || '',
+  stock_status: props.filters.stock_status || '',
+  product_status: props.filters.product_status || '',
 })
 
 const hasFilters = computed(() => {
   return Object.values(filters.value).some(value => value !== '')
 })
 
+const lowStockProducts = computed(() => {
+  return props.products.data.filter(product => product.is_low_stock)
+})
+
 const paginationRange = computed(() => {
-  const current = props.transactions.current_page
-  const last = props.transactions.last_page
+  const current = props.products.current_page
+  const last = props.products.last_page
   const delta = 2
   const range = []
   const rangeWithDots = []
@@ -541,6 +539,13 @@ const paginationRange = computed(() => {
 })
 
 // Formatting functions
+const formatNumber = (num) => {
+  return parseFloat(num).toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })
+}
+
 const formatCurrency = (amount) => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -550,62 +555,38 @@ const formatCurrency = (amount) => {
   }).format(amount)
 }
 
-const formatDate = (date) => {
-  return new Date(date).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-}
-
-const formatTime = (date) => {
-  return new Date(date).toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-const formatQuantity = (quantity, type) => {
-  const isIncrement = ['purchase', 'return', 'transfer_in', 'production'].includes(type)
-  const isAdjustment = type === 'adjustment'
-  
-  if (isAdjustment) {
-    return quantity > 0 ? `+${quantity}` : quantity.toString()
-  }
-  
-  return isIncrement ? `+${quantity}` : `-${quantity}`
-}
-
 // Styling functions
-const getTransactionTypeBadgeClass = (type) => {
-  const classes = {
-    'purchase': 'inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800',
-    'sale': 'inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800',
-    'adjustment': 'inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800',
-    'return': 'inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800',
-    'damage': 'inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800',
-    'transfer_in': 'inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800',
-    'transfer_out': 'inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800',
-    'production': 'inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800',
-    'consumption': 'inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800',
-  }
-  return classes[type] || 'inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800'
+const getStockLevelClass = (available) => {
+  if (available <= 0) return 'text-red-600'
+  if (available <= 10) return 'text-yellow-600'
+  return 'text-green-600'
 }
 
-const getQuantityTextClass = (transaction) => {
-  const isIncrement = ['purchase', 'return', 'transfer_in', 'production'].includes(transaction.transaction_type)
-  const isAdjustment = transaction.transaction_type === 'adjustment'
-  
-  if (isAdjustment) {
-    return transaction.quantity > 0 ? 'text-green-600' : 'text-red-600'
+const getStockStatusText = (product) => {
+  if (product.total_available <= 0) return 'Out of Stock'
+  if (product.total_available <= product.low_stock_threshold) return 'Low Stock'
+  return 'In Stock'
+}
+
+const getStockStatusBadgeClass = (product) => {
+  if (product.total_available <= 0) {
+    return 'inline-flex px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800'
   }
-  
-  return isIncrement ? 'text-green-600' : 'text-red-600'
+  if (product.total_available <= product.low_stock_threshold) {
+    return 'inline-flex px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800'
+  }
+  return 'inline-flex px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800'
+}
+
+const getProductStatusBadgeClass = (product) => {
+  return product.is_active 
+    ? 'inline-flex px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800'
+    : 'inline-flex px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800'
 }
 
 // Actions
 const applyFilters = debounce(() => {
-  router.get(route('inventory.transactions.index'), {
+  router.get(route('products.stock-report'), {
     ...filters.value,
     per_page: perPage.value,
   }, {
@@ -617,22 +598,9 @@ const applyFilters = debounce(() => {
 const resetFilters = () => {
   filters.value = {
     search: '',
-    transaction_type: '',
-    warehouse_id: '',
-    start_date: '',
-    end_date: '',
-    sort_by: 'transaction_date',
-    sort_order: 'desc',
-  }
-  applyFilters()
-}
-
-const sortBy = (column) => {
-  if (filters.value.sort_by === column) {
-    filters.value.sort_order = filters.value.sort_order === 'asc' ? 'desc' : 'asc'
-  } else {
-    filters.value.sort_by = column
-    filters.value.sort_order = 'desc'
+    category_id: '',
+    stock_status: '',
+    product_status: '',
   }
   applyFilters()
 }
@@ -642,9 +610,9 @@ const updatePerPage = () => {
 }
 
 const goToPage = (page) => {
-  if (page < 1 || page > props.transactions.last_page) return
+  if (page < 1 || page > props.products.last_page) return
   
-  router.get(route('inventory.transactions.index'), {
+  router.get(route('products.stock-report'), {
     ...filters.value,
     per_page: perPage.value,
     page: page,
@@ -654,23 +622,28 @@ const goToPage = (page) => {
   })
 }
 
-const createTransaction = () => {
-  router.visit(route('inventory.transactions.create'))
+const viewProduct = (product) => {
+  router.visit(route('products.show', product.id))
 }
 
-const viewTransaction = (transaction) => {
-  router.visit(route('inventory.transactions.show', transaction.id))
+const viewInventory = (product) => {
+  router.visit(route('products.inventory', product.id))
 }
 
-const showNotes = (transaction) => {
-  selectedTransaction.value = transaction
-  showNotesModal.value = true
+const createReorder = (product) => {
+  // Navigate to purchase order creation with product pre-selected
+  router.visit(route('purchase-orders.create'), {
+    data: {
+      product_id: product.id,
+      quantity: product.low_stock_threshold * 2, // Suggest ordering 2x threshold
+    }
+  })
 }
 
-const exportData = async () => {
+const exportReport = async () => {
   exporting.value = true
   try {
-    const response = await axios.get(route('inventory.transactions.index'), {
+    const response = await axios.get(route('products.stock-report'), {
       params: {
         ...filters.value,
         export: 'csv',
@@ -681,7 +654,7 @@ const exportData = async () => {
     const url = window.URL.createObjectURL(new Blob([response.data]))
     const link = document.createElement('a')
     link.href = url
-    link.setAttribute('download', `inventory-transactions-${new Date().toISOString().split('T')[0]}.csv`)
+    link.setAttribute('download', `stock-report-${new Date().toISOString().split('T')[0]}.csv`)
     document.body.appendChild(link)
     link.click()
     link.remove()

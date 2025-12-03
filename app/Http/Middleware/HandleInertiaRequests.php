@@ -61,6 +61,12 @@ class HandleInertiaRequests extends Middleware
                     'location' => $request->url(),
                 ]);
             },
+        'currency' => [
+            'symbol' => 'GH₵',
+            'code' => 'GHS',
+            'name' => 'Ghana Cedi',
+            'position' => 'before', // or 'after'
+        ],
         ]);
     }
 }

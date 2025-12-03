@@ -209,4 +209,6 @@ class InventoryLevel extends Model
     {
         return $query->whereRaw('quantity_on_hand - quantity_committed <= 0');
     }
+
+    
 }

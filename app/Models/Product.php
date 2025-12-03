@@ -173,6 +173,10 @@ public function availableWarehouses()
         ->pluck('warehouse');
 }
 
+public function scopeActive($query)
+{
+    return $query->where('is_active', true);
+}
 /**
  * Get stock levels by warehouse
  */

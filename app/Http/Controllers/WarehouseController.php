@@ -8,16 +8,35 @@ use Inertia\Inertia;
 
 class WarehouseController extends Controller
 {
-    public function index()
-    {
-        $warehouses = Warehouse::withCount(['inventoryLevels as product_count'])
-            ->latest()
-            ->paginate(20);
-            
-        return Inertia::render('Inventory/Warehouses/index', [
-            'warehouses' => $warehouses,
-        ]);
+public function index(Request $request)
+{
+    $query = Warehouse::withCount(['inventoryLevels as product_count']);
+    
+    // Apply filters if provided
+    if ($request->filled('search')) {
+        $search = $request->input('search');
+        $query->where(function ($q) use ($search) {
+            $q->where('name', 'like', "%{$search}%")
+              ->orWhere('code', 'like', "%{$search}%")
+              ->orWhere('location', 'like', "%{$search}%");
+        });
     }
+    
+    if ($request->filled('status')) {
+        if ($request->input('status') === 'active') {
+            $query->where('is_active', true);
+        } elseif ($request->input('status') === 'inactive') {
+            $query->where('is_active', false);
+        }
+    }
+    
+    $warehouses = $query->latest()->paginate(20);
+        
+    return Inertia::render('Inventory/Warehouses/index', [
+        'warehouses' => $warehouses,
+        'filters' => $request->only(['search', 'status']), // Pass filters to Vue
+    ]);
+}
     
     public function create()
     {

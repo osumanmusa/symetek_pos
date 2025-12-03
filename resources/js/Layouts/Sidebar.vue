@@ -56,7 +56,7 @@
                 <p class="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">SALES</p>
                 <div class="mt-2 space-y-1">
                     <Link v-if="can('create sales')" 
-                        :href="route('sales.create')"
+                        :href="route('sales.index')"
                         :class="[
                             'flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors',
                             $page.url.startsWith('/sales/create') 
@@ -141,20 +141,112 @@
             Categories
         </Link>
                     
-                    <Link v-if="can('view inventory')" 
-                        :href="route('inventory.index')"
-                        :class="[
-                            'flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors',
-                            $page.url.startsWith('/inventory') 
-                                ? 'bg-blue-600 text-white' 
-                                : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-                        ]"
-                        @click="handleNavigation">
-                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                        </svg>
-                        Inventory
-                    </Link>
+
+<!-- Inventory Dropdown -->
+<div v-if="can('view inventory')" class="mb-2">
+    <button
+        @click="toggleInventoryDropdown"
+        :class="[
+            'flex items-center justify-between w-full px-4 py-3 text-sm font-medium rounded-lg transition-colors',
+            isInventoryActive 
+                ? 'bg-blue-600 text-white' 
+                : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+        ]"
+    >
+        <div class="flex items-center">
+            <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            Inventory
+        </div>
+        <svg 
+            :class="[
+                'w-4 h-4 transition-transform duration-200',
+                inventoryDropdownOpen ? 'transform rotate-180' : ''
+            ]" 
+            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+        >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+        </svg>
+    </button>
+    
+    <!-- Dropdown Menu -->
+    <div 
+        v-show="inventoryDropdownOpen" 
+        class="mt-1 ml-8 space-y-1"
+    >
+        <!-- Dashboard -->
+        <Link
+            :href="route('inventory.index')"
+            :class="[
+                'flex items-center px-3 py-2 text-sm rounded-md transition-colors',
+                $page.url === '/inventory' 
+                    ? 'bg-blue-100 text-blue-700' 
+                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+            ]"
+        >
+            <span class="w-1 h-3 mr-2 bg-blue-500 rounded-full"></span>
+            Inventory Dashboard
+        </Link>
+        
+        <!-- Transactions -->
+        <Link
+            :href="route('inventory.transactions.index')"
+            :class="[
+                'flex items-center px-3 py-2 text-sm rounded-md transition-colors',
+                $page.url.startsWith('/inventory-transactions') || $page.url.startsWith('/inventory/transactions')
+                    ? 'bg-blue-100 text-blue-700' 
+                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+            ]"
+        >
+            <span class="w-1 h-3 mr-2 bg-green-500 rounded-full"></span>
+            Transactions
+        </Link>
+        
+        <!-- Stock Levels -->
+        <Link
+            :href="route('inventory.levels.index')"
+            :class="[
+                'flex items-center px-3 py-2 text-sm rounded-md transition-colors',
+                $page.url.startsWith('/inventory/stock-levels') || $page.url.startsWith('/inventory/levels')
+                    ? 'bg-blue-100 text-blue-700' 
+                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+            ]"
+        >
+            <span class="w-1 h-3 mr-2 bg-yellow-500 rounded-full"></span>
+            Stock Levels
+        </Link>
+        
+        <!-- Warehouses -->
+        <Link
+            :href="route('warehouses.index')"
+            :class="[
+                'flex items-center px-3 py-2 text-sm rounded-md transition-colors',
+                $page.url.startsWith('/warehouses')
+                    ? 'bg-blue-100 text-blue-700' 
+                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+            ]"
+        >
+            <span class="w-1 h-3 mr-2 bg-purple-500 rounded-full"></span>
+            Warehouses
+        </Link>
+        
+        <!-- Stock Report -->
+        <Link
+            :href="route('products.stock-report')"
+            :class="[
+                'flex items-center px-3 py-2 text-sm rounded-md transition-colors',
+                $page.url.startsWith('/products/stock-report')
+                    ? 'bg-blue-100 text-blue-700' 
+                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+            ]"
+        >
+            <span class="w-1 h-3 mr-2 bg-red-500 rounded-full"></span>
+            Stock Report
+        </Link>
+    </div>
+</div>
+
                     
                     <Link v-if="can('view suppliers')" 
                         :href="route('suppliers.index')"
@@ -414,7 +506,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 
 const props = defineProps({
@@ -438,6 +530,33 @@ const userInitials = computed(() => {
         .toUpperCase()
         .substring(0, 2);
 });
+
+
+// Inventory dropdown state
+const inventoryDropdownOpen = ref(false)
+
+// Check if any inventory page is active
+const isInventoryActive = computed(() => {
+  const url = page.url
+  return url.startsWith('/inventory') || 
+         url.startsWith('/inventory-transactions') ||
+         url.startsWith('/warehouses')
+})
+
+// Toggle dropdown
+const toggleInventoryDropdown = () => {
+  inventoryDropdownOpen.value = !inventoryDropdownOpen.value
+}
+
+// Auto-open dropdown when on inventory page
+watch(() => page.url, (newUrl) => {
+  if (newUrl.startsWith('/inventory') || 
+      newUrl.startsWith('/inventory-transactions') ||
+      newUrl.startsWith('/warehouses')) {
+    inventoryDropdownOpen.value = true
+  }
+}, { immediate: true })
+
 
 const can = (permission) => {
     return user.value?.permissions?.includes(permission);

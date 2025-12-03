@@ -206,4 +206,36 @@ class InventoryService
         
         return $query->get();
     }
+
+
+/**
+ * Process multiple inventory transactions
+ */
+public function processBulkTransactions(array $data): array
+{
+    return DB::transaction(function () use ($data) {
+        $transactions = [];
+        
+        foreach ($data['items'] as $item) {
+            $transactionData = [
+                'product_id' => $item['product_id'],
+                'transaction_type' => $data['transaction_type'],
+                'quantity' => $item['quantity'],
+                'unit_cost' => $item['unit_cost'] ?? null,
+                'total_cost' => isset($item['unit_cost']) ? $item['quantity'] * $item['unit_cost'] : null,
+                'warehouse_id' => $data['warehouse_id'] ?? null,
+                'user_id' => $data['user_id'],
+                'reference_number' => $data['reference_number'] ?? null,
+                'notes' => $item['notes'] ?? $data['notes'] ?? null,
+            ];
+            
+            $transaction = $this->processTransaction($transactionData);
+            $transactions[] = $transaction;
+        }
+        
+        return $transactions;
+    });
+}
+
+
 }

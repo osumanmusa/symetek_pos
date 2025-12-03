@@ -12,7 +12,7 @@
             {{ exporting ? 'Exporting...' : 'Export' }}
           </SecondaryButton>
           <PrimaryButton @click="showFilters = !showFilters">
-            <FilterIcon class="h-4 w-4 mr-2" />
+            <FunnelIcon class="h-4 w-4 mr-2" />
             Filters
           </PrimaryButton>
         </div>
@@ -296,7 +296,7 @@ import InputLabel from '@/Components/InputLabel.vue'
 import TextInput from '@/Components/TextInput.vue'
 import Pagination from '@/Components/Pagination.vue'
 import { 
-  FilterIcon,
+  FunnelIcon,
   ArrowDownTrayIcon,
   CubeIcon,
   CheckCircleIcon,

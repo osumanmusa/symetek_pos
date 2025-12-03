@@ -18,7 +18,8 @@
         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
           <div class="p-6">
             <form @submit.prevent="submit">
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <!-- Transaction Header -->
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <!-- Transaction Type -->
                 <div>
                   <InputLabel for="transaction_type" value="Transaction Type" required />
@@ -34,121 +35,23 @@
                       {{ label }}
                     </option>
                   </select>
-                  <InputError :message="errors.transaction_type" class="mt-2" />
-                </div>
-
-                <!-- Product Selection -->
-                <div>
-                  <InputLabel for="product_id" value="Product" required />
-                  <select
-                    id="product_id"
-                    v-model="form.product_id"
-                    @change="getProductStock"
-                    class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
-                    required
-                  >
-                    <option value="">Select Product</option>
-                    <option v-for="product in products" :key="product.id" :value="product.id">
-                      {{ product.name }} ({{ product.sku }})
-                    </option>
-                  </select>
-                  <InputError :message="errors.product_id" class="mt-2" />
+                  <InputError :message="form.errors.transaction_type" class="mt-2" />
                 </div>
 
                 <!-- Warehouse Selection -->
                 <div>
                   <InputLabel for="warehouse_id" value="Warehouse" />
-                  <div class="flex items-center space-x-2">
-                    <select
-                      id="warehouse_id"
-                      v-model="form.warehouse_id"
-                      class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
-                    >
-                      <option value="">Default Warehouse</option>
-                      <option v-for="warehouse in warehouses" :key="warehouse.id" :value="warehouse.id">
-                        {{ warehouse.name }} ({{ warehouse.code }})
-                      </option>
-                    </select>
-                    <a
-                      v-if="form.product_id"
-                      :href="route('products.inventory', form.product_id)"
-                      target="_blank"
-                      class="text-sm text-indigo-600 hover:text-indigo-900"
-                    >
-                      View Stock
-                    </a>
-                  </div>
-                  <InputError :message="errors.warehouse_id" class="mt-2" />
-                </div>
-
-                <!-- Quantity -->
-                <div>
-                  <InputLabel for="quantity" value="Quantity" required />
-                  <div class="flex items-center space-x-2">
-                    <TextInput
-                      id="quantity"
-                      v-model="form.quantity"
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      class="mt-1 block w-full"
-                      required
-                      @input="calculateTotal"
-                    />
-                    <span v-if="selectedProduct" class="text-sm text-gray-500">
-                      {{ selectedProduct.unit || 'units' }}
-                    </span>
-                  </div>
-                  <div v-if="stockInfo" class="mt-1 text-sm">
-                    <span class="text-gray-600">Available: </span>
-                    <span :class="{
-                      'text-green-600 font-semibold': stockInfo.available_stock >= form.quantity,
-                      'text-red-600 font-semibold': stockInfo.available_stock < form.quantity
-                    }">
-                      {{ stockInfo.available_stock }}
-                    </span>
-                  </div>
-                  <InputError :message="errors.quantity" class="mt-2" />
-                </div>
-
-                <!-- Unit Cost -->
-                <div v-if="showCostFields">
-                  <InputLabel for="unit_cost" value="Unit Cost" />
-                  <div class="relative mt-1 rounded-md shadow-sm">
-                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                      <span class="text-gray-500 sm:text-sm">₵</span>
-                    </div>
-                    <TextInput
-                      id="unit_cost"
-                      v-model="form.unit_cost"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      class="block w-full pl-7"
-                      @input="calculateTotal"
-                    />
-                  </div>
-                  <InputError :message="errors.unit_cost" class="mt-2" />
-                </div>
-
-                <!-- Total Cost -->
-                <div v-if="showCostFields">
-                  <InputLabel for="total_cost" value="Total Cost" />
-                  <div class="relative mt-1 rounded-md shadow-sm">
-                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                      <span class="text-gray-500 sm:text-sm">₵</span>
-                    </div>
-                    <TextInput
-                      id="total_cost"
-                      v-model="form.total_cost"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      class="block w-full pl-7 bg-gray-50"
-                      readonly
-                    />
-                  </div>
-                  <InputError :message="errors.total_cost" class="mt-2" />
+                  <select
+                    id="warehouse_id"
+                    v-model="form.warehouse_id"
+                    class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                  >
+                    <option value="">Default Warehouse</option>
+                    <option v-for="warehouse in warehouses" :key="warehouse.id" :value="warehouse.id">
+                      {{ warehouse.name }} ({{ warehouse.code }})
+                    </option>
+                  </select>
+                  <InputError :message="form.errors.warehouse_id" class="mt-2" />
                 </div>
 
                 <!-- Reference Number -->
@@ -161,65 +64,248 @@
                     class="mt-1 block w-full"
                     placeholder="PO, Invoice, Transfer number..."
                   />
-                  <InputError :message="errors.reference_number" class="mt-2" />
+                  <InputError :message="form.errors.reference_number" class="mt-2" />
                 </div>
+              </div>
 
-                <!-- Notes -->
-                <div class="md:col-span-2">
-                  <InputLabel for="notes" value="Notes" />
-                  <textarea
-                    id="notes"
-                    v-model="form.notes"
-                    rows="3"
-                    class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
-                    :placeholder="notesPlaceholder"
-                  />
-                  <InputError :message="errors.notes" class="mt-2" />
+              <!-- Add Product Form -->
+              <div class="bg-gray-50 p-4 rounded-lg mb-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Add Products</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  <!-- Product Search/Select -->
+                  <div>
+                    <InputLabel for="new_product_id" value="Product" />
+                    <select
+                      id="new_product_id"
+                      v-model="newProduct.product_id"
+                      class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                    >
+                      <option value="">Select Product</option>
+                      <option v-for="product in products" :key="product.id" :value="product.id">
+                        {{ product.name }} ({{ product.sku }})
+                      </option>
+                    </select>
+                  </div>
+
+                  <!-- Quantity -->
+                  <div>
+                    <InputLabel for="new_quantity" value="Quantity" />
+                    <TextInput
+                      id="new_quantity"
+                      v-model="newProduct.quantity"
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      class="mt-1 block w-full"
+                      placeholder="Qty"
+                    />
+                  </div>
+
+                  <!-- Unit Cost -->
+                  <div v-if="showCostFields">
+                    <InputLabel for="new_unit_cost" value="Unit Cost" />
+                    <div class="relative mt-1 rounded-md shadow-sm">
+                      <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                        <span class="text-gray-500 sm:text-sm">₵</span>
+                      </div>
+                      <TextInput
+                        id="new_unit_cost"
+                        v-model="newProduct.unit_cost"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        class="block w-full pl-7"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+
+                  <!-- Notes -->
+                  <div>
+                    <InputLabel for="new_notes" value="Notes" />
+                    <TextInput
+                      id="new_notes"
+                      v-model="newProduct.notes"
+                      type="text"
+                      class="mt-1 block w-full"
+                      placeholder="Item notes"
+                    />
+                  </div>
+
+                  <!-- Add Button -->
+                  <div class="flex items-end">
+                    <PrimaryButton
+                      type="button"
+                      @click="addProduct"
+                      :disabled="!canAddProduct"
+                      class="w-full"
+                    >
+                      <PlusIcon class="h-4 w-4 mr-2" />
+                      Add Product
+                    </PrimaryButton>
+                  </div>
                 </div>
+              </div>
 
-                <!-- Summary Card -->
-                <div class="md:col-span-2">
-                  <div class="bg-gray-50 p-4 rounded-lg">
-                    <h3 class="text-lg font-medium text-gray-900 mb-2">Transaction Summary</h3>
-                    <div class="space-y-2">
-                      <div class="flex justify-between">
-                        <span class="text-gray-600">Type:</span>
-                        <span class="font-medium">
-                          {{ transactionTypes[form.transaction_type] || 'Not selected' }}
-                        </span>
-                      </div>
-                      <div v-if="selectedProduct" class="flex justify-between">
-                        <span class="text-gray-600">Product:</span>
-                        <span class="font-medium">{{ selectedProduct.name }}</span>
-                      </div>
-                      <div v-if="form.quantity" class="flex justify-between">
-                        <span class="text-gray-600">Quantity:</span>
-                        <span class="font-medium">{{ form.quantity }} {{ selectedProduct?.unit || 'units' }}</span>
-                      </div>
-                      <div v-if="form.unit_cost" class="flex justify-between">
-                        <span class="text-gray-600">Unit Cost:</span>
-                        <span class="font-medium">₵{{ parseFloat(form.unit_cost).toFixed(2) }}</span>
-                      </div>
-                      <div v-if="form.total_cost" class="flex justify-between">
-                        <span class="text-gray-600">Total Cost:</span>
-                        <span class="font-medium">₵{{ parseFloat(form.total_cost).toFixed(2) }}</span>
-                      </div>
+              <!-- Products Table -->
+              <div class="mb-8" v-if="form.items.length > 0">
+                <div class="overflow-x-auto">
+                  <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-100">
+                      <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Product
+                        </th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Quantity
+                        </th>
+                        <th v-if="showCostFields" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Unit Cost
+                        </th>
+                        <th v-if="showCostFields" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Total Cost
+                        </th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Notes
+                        </th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                      <tr v-for="(item, index) in form.items" :key="index">
+                        <td class="px-4 py-3 whitespace-nowrap">
+                          <div class="text-sm font-medium text-gray-900">
+                            {{ getProductName(item.product_id) }}
+                          </div>
+                          <div class="text-sm text-gray-500">
+                            {{ getProductSKU(item.product_id) }}
+                          </div>
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                          {{ item.quantity }} {{ getProductUnit(item.product_id) }}
+                        </td>
+                        <td v-if="showCostFields" class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                          ₵{{ formatNumber(item.unit_cost) }}
+                        </td>
+                        <td v-if="showCostFields" class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                          ₵{{ formatNumber(item.quantity * item.unit_cost) }}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-500">
+                          {{ item.notes || '-' }}
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                          <button
+                            type="button"
+                            @click="removeProduct(index)"
+                            class="text-red-600 hover:text-red-900"
+                            title="Remove"
+                          >
+                            <TrashIcon class="h-5 w-5" />
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                    <!-- Totals Row -->
+                    <tfoot v-if="showCostFields && form.items.length > 0" class="bg-gray-50">
+                      <tr>
+                        <td colspan="3" class="px-4 py-3 text-right text-sm font-medium text-gray-900">
+                          Subtotal:
+                        </td>
+                        <td class="px-4 py-3 text-sm font-bold text-gray-900">
+                          ₵{{ formatNumber(subtotal) }}
+                        </td>
+                        <td colspan="2"></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Empty State for Products -->
+              <div v-if="form.items.length === 0" class="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg mb-8">
+                <CubeIcon class="mx-auto h-12 w-12 text-gray-400" />
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No products added</h3>
+                <p class="mt-1 text-sm text-gray-500">
+                  Add products to this transaction using the form above.
+                </p>
+              </div>
+
+              <!-- Transaction Summary -->
+              <div class="bg-gray-50 p-6 rounded-lg mb-8">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Transaction Summary</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div class="space-y-4">
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">Transaction Type:</span>
+                      <span class="font-medium">
+                        {{ transactionTypes[form.transaction_type] || 'Not selected' }}
+                      </span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">Warehouse:</span>
+                      <span class="font-medium">
+                        {{ getWarehouseName(form.warehouse_id) || 'Default' }}
+                      </span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">Reference:</span>
+                      <span class="font-medium">
+                        {{ form.reference_number || 'Not provided' }}
+                      </span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">Number of Products:</span>
+                      <span class="font-medium">
+                        {{ form.items.length }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="space-y-4" v-if="showCostFields">
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">Total Quantity:</span>
+                      <span class="font-medium">
+                        {{ totalQuantity }}
+                      </span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">Subtotal:</span>
+                      <span class="font-medium">₵{{ formatNumber(subtotal) }}</span>
+                    </div>
+                    <div class="flex justify-between border-t pt-4">
+                      <span class="text-lg font-bold text-gray-900">Total Cost:</span>
+                      <span class="text-lg font-bold text-indigo-600">₵{{ formatNumber(subtotal) }}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div class="flex items-center justify-end mt-8">
+              <!-- Notes -->
+              <div class="mb-8">
+                <InputLabel for="notes" value="Transaction Notes" />
+                <textarea
+                  id="notes"
+                  v-model="form.notes"
+                  rows="3"
+                  class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                  :placeholder="notesPlaceholder"
+                />
+                <InputError :message="form.errors.notes" class="mt-2" />
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="flex items-center justify-end space-x-4">
                 <SecondaryButton
                   type="button"
-                  @click="router.visit(route('inventory.transactions.index'))"
-                  class="mr-4"
+                  @click="router.visit(route('inventory-transactions.index'))"
                 >
                   Cancel
                 </SecondaryButton>
                 <PrimaryButton
                   type="submit"
-                  :disabled="form.processing"
+                  :disabled="form.processing || !canSubmit"
                 >
                   <span v-if="form.processing">Processing...</span>
                   <span v-else>Record Transaction</span>
@@ -242,31 +328,36 @@ import TextInput from '@/Components/TextInput.vue'
 import InputError from '@/Components/InputError.vue'
 import { useForm, router } from '@inertiajs/vue3'
 import { ref, computed, watch } from 'vue'
-import axios from 'axios'
+import { 
+  PlusIcon, 
+  TrashIcon, 
+  CubeIcon 
+} from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   products: Array,
   warehouses: Array,
   transactionTypes: Object,
-  errors: Object,
 })
 
+// Initialize form with items array for multiple products
 const form = useForm({
   transaction_type: '',
+  warehouse_id: '',
+  reference_number: '',
+  notes: '',
+  items: [], // Array of {product_id, quantity, unit_cost, notes}
+})
+
+// New product being added
+const newProduct = ref({
   product_id: '',
   quantity: 1,
   unit_cost: null,
-  total_cost: null,
-  warehouse_id: '',
-  notes: '',
-  reference_number: '',
+  notes: ''
 })
 
-const stockInfo = ref(null)
-const selectedProduct = computed(() => 
-  props.products.find(p => p.id == form.product_id)
-)
-
+// Computed properties
 const showCostFields = computed(() => {
   return ['purchase', 'return', 'production'].includes(form.transaction_type)
 })
@@ -276,49 +367,125 @@ const notesPlaceholder = computed(() => {
   if (type === 'adjustment') return 'Reason for adjustment...'
   if (type === 'damage') return 'Details of damage...'
   if (type === 'transfer') return 'Transfer details...'
-  return 'Additional notes...'
+  return 'Additional notes about this transaction...'
 })
 
-const getProductStock = async () => {
-  if (!form.product_id || !form.warehouse_id) return
-  
-  try {
-    const response = await axios.get(route('products.stock', form.product_id), {
-      params: { warehouse_id: form.warehouse_id }
+const canAddProduct = computed(() => {
+  return newProduct.value.product_id && newProduct.value.quantity > 0
+})
+
+const canSubmit = computed(() => {
+  return form.transaction_type && form.items.length > 0
+})
+
+const totalQuantity = computed(() => {
+  return form.items.reduce((sum, item) => sum + parseFloat(item.quantity), 0)
+})
+
+const subtotal = computed(() => {
+  if (!showCostFields.value) return 0
+  return form.items.reduce((sum, item) => {
+    const cost = item.unit_cost || 0
+    return sum + (parseFloat(item.quantity) * parseFloat(cost))
+  }, 0)
+})
+
+// Helper functions
+const getProductName = (productId) => {
+  const product = props.products.find(p => p.id == productId)
+  return product?.name || 'Unknown Product'
+}
+
+const getProductSKU = (productId) => {
+  const product = props.products.find(p => p.id == productId)
+  return product?.sku || ''
+}
+
+const getProductUnit = (productId) => {
+  const product = props.products.find(p => p.id == productId)
+  return product?.unit || 'units'
+}
+
+const getWarehouseName = (warehouseId) => {
+  const warehouse = props.warehouses.find(w => w.id == warehouseId)
+  return warehouse?.name
+}
+
+const formatNumber = (num) => {
+  return parseFloat(num || 0).toFixed(2)
+}
+
+// Methods
+const addProduct = () => {
+  if (!canAddProduct.value) return
+
+  // Check if product already exists in items
+  const existingIndex = form.items.findIndex(item => 
+    item.product_id == newProduct.value.product_id
+  )
+
+  if (existingIndex > -1) {
+    // Update existing item
+    form.items[existingIndex].quantity = parseFloat(form.items[existingIndex].quantity) + 
+                                         parseFloat(newProduct.value.quantity)
+    if (newProduct.value.unit_cost) {
+      form.items[existingIndex].unit_cost = newProduct.value.unit_cost
+    }
+    if (newProduct.value.notes) {
+      form.items[existingIndex].notes = newProduct.value.notes
+    }
+  } else {
+    // Add new item
+    form.items.push({
+      product_id: newProduct.value.product_id,
+      quantity: parseFloat(newProduct.value.quantity),
+      unit_cost: newProduct.value.unit_cost ? parseFloat(newProduct.value.unit_cost) : null,
+      notes: newProduct.value.notes || ''
     })
-    stockInfo.value = response.data
-  } catch (error) {
-    console.error('Error fetching stock:', error)
-    stockInfo.value = null
+  }
+
+  // Reset new product form
+  newProduct.value = {
+    product_id: '',
+    quantity: 1,
+    unit_cost: null,
+    notes: ''
   }
 }
 
-const calculateTotal = () => {
-  if (form.quantity && form.unit_cost) {
-    form.total_cost = parseFloat(form.quantity) * parseFloat(form.unit_cost)
-  } else {
-    form.total_cost = null
-  }
+const removeProduct = (index) => {
+  form.items.splice(index, 1)
 }
 
 const onTransactionTypeChange = () => {
-  // Reset cost fields when type changes
+  // Clear unit costs if not showing cost fields
   if (!showCostFields.value) {
-    form.unit_cost = null
-    form.total_cost = null
+    form.items.forEach(item => {
+      item.unit_cost = null
+    })
+    newProduct.value.unit_cost = null
   }
 }
 
 const submit = () => {
-  form.post(route('inventory.transactions.store'), {
+  // Prepare data for submission
+  const submissionData = {
+    ...form.data(),
+    user_id: window.auth?.user?.id // Make sure to send user ID
+  }
+
+  form.post(route('inventory-transactions.store'), {
     preserveScroll: true,
     onSuccess: () => {
       form.reset()
+      newProduct.value = {
+        product_id: '',
+        quantity: 1,
+        unit_cost: null,
+        notes: ''
+      }
     },
   })
 }
-
-watch(() => form.warehouse_id, getProductStock)
-watch(() => form.product_id, getProductStock)
 </script>
 [file content end]

@@ -11,8 +11,12 @@ use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\InventoryTransactionController;
 use App\Http\Controllers\InventoryDashboardController;
 use App\Http\Controllers\InventoryLevelController;
-
+use App\Http\Controllers\InventoryAdjustmentController;
+use App\Http\Controllers\InventoryTransferController;
+use App\Http\Controllers\SaleController;
+use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\WarehouseController;
+use App\Http\Controllers\CustomerController;
 
 
 use Illuminate\Support\Facades\Route;
@@ -54,6 +58,8 @@ Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard
     });
     
     // POS Routes - Create placeholder routes for all navigation items
+Route::post('/inventory/adjustment', [InventoryAdjustmentController::class, 'store'])->name('inventory.adjustment.store');
+Route::post('/inventory/transfer', [InventoryTransferController::class, 'store'])->name('inventory.transfer.store');
 
     // Products Routes
 Route::prefix('products')->name('products.')->group(function () {
@@ -93,8 +99,11 @@ Route::prefix('products')->name('products.')->group(function () {
         Route::get('/', [InventoryTransactionController::class, 'index'])->name('index');
         Route::get('/create', [InventoryTransactionController::class, 'create'])->name('create');
         Route::post('/', [InventoryTransactionController::class, 'store'])->name('store');
+        
         Route::get('/{transaction}', [InventoryTransactionController::class, 'show'])->name('show');
     });
+
+        Route::post('/inventory-transactions', [InventoryTransactionController::class, 'store'])->name('inventory-transactions.store');
     // Purchase Orders
     Route::resource('purchase-orders', PurchaseOrderController::class);
         // Purchase Orders
@@ -161,6 +170,30 @@ Route::get('/export-purchase-orders', [PurchaseOrderController::class, 'export']
     //     })->name('create');
     // });
     
+    // Sales Management
+    
+    // Payments
+
+// POS page
+    Route::get('/pos', [SaleController::class, 'pos'])->name('pos');
+    
+    // Sales management
+    Route::get('/sales', [SaleController::class, 'index'])->name('sales.index');
+    Route::get('/sales/{sale}', [SaleController::class, 'show'])->name('sales.show');
+    Route::get('/sales/{sale}/receipt', [SaleController::class, 'printReceipt'])->name('sales.receipt');
+    
+    // Payments
+    Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
+    
+    // Customer management (form submissions)
+    Route::post('/customers/store', [CustomerController::class, 'store'])->name('customers.store');
+    Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
+    
+    // Sale processing
+    Route::post('/sales/process', [SaleController::class, 'processSale'])->name('sales.process');
+    Route::post('/sales/check-product', [SaleController::class, 'checkProduct'])->name('sales.check-product');
+    Route::post('/sales/search-products', [SaleController::class, 'searchProducts'])->name('sales.search-products');
+
     Route::resource('suppliers', SupplierController::class);
     Route::prefix('customers')->name('customers.')->group(function () {
         Route::get('/', function () {
@@ -172,9 +205,9 @@ Route::get('/export-purchase-orders', [PurchaseOrderController::class, 'export']
     });
     
     Route::prefix('sales')->name('sales.')->group(function () {
-        Route::get('/', function () {
-            return inertia('Sales/Index');
-        })->name('index');
+        // Route::get('/', function () {
+        //     return inertia('Sales/Index');
+        // })->name('index');
         Route::get('/create', function () {
             return inertia('Sales/Create');
         })->name('create');
