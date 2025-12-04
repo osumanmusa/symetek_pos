@@ -102,6 +102,9 @@ Route::prefix('products')->name('products.')->group(function () {
         
         Route::get('/{transaction}', [InventoryTransactionController::class, 'show'])->name('show');
     });
+    // routes/web.php
+Route::get('/inventory/receive', [InventoryTransactionController::class, 'createReceive'])->name('inventory.receive');
+Route::post('/inventory/receive', [InventoryTransactionController::class, 'storeReceive'])->name('inventory.receive.store');
 
         Route::post('/inventory-transactions', [InventoryTransactionController::class, 'store'])->name('inventory-transactions.store');
     // Purchase Orders

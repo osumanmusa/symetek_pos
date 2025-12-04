@@ -182,4 +182,21 @@ class Sale extends Model
     {
         return $this->items()->count();
     }
+  
+
+    public function payments()
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    public function inventoryTransactions()
+    {
+        return $this->hasMany(InventoryTransaction::class, 'reference_number', 'invoice_number');
+    }
+
+    public function warehouse()
+    {
+        return $this->belongsTo(Warehouse::class);
+    }
+
 }

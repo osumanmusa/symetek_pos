@@ -471,5 +471,142 @@ public function adjust(Request $request)
             ], 500);
         }
     }
+// In InventoryTransactionController.php, add these methods:
 
+/**
+ * Show receive goods interface (unified for new products and stock receiving)
+ */
+public function createReceive()
+{
+    return Inertia::render('Inventory/Transactions/Receive', [
+        'warehouses' => Warehouse::active()->get(['id', 'name', 'code']),
+        'suppliers' => \App\Models\Supplier::active()->get(['id', 'name', 'supplier_code']),
+        'categories' => \App\Models\Category::active()->get(['id', 'name']),
+        'existingProducts' => Product::active()
+            ->with(['category'])
+            ->orderBy('name')
+            ->get(['id', 'name', 'sku', 'barcode', 'selling_price', 'cost_price', 'unit', 'category_id'])
+            ->take(100), // Limit for performance
+        'paymentMethods' => [
+            'cash' => 'Cash',
+            'bank_transfer' => 'Bank Transfer',
+            'cheque' => 'Cheque',
+            'credit' => 'Credit'
+        ],
+    ]);
+}
+
+/**
+ * Process receive goods (can create new products or add to existing)
+ */
+public function storeReceive(Request $request)
+{
+    $validated = $request->validate([
+        'supplier_id' => 'nullable|exists:suppliers,id',
+        'warehouse_id' => 'required|exists:warehouses,id',
+        'reference_number' => 'nullable|string',
+        'invoice_number' => 'nullable|string',
+        'payment_method' => 'nullable|string',
+        'notes' => 'nullable|string',
+        'items' => 'required|array|min:1',
+        'items.*.type' => 'required|in:existing,new',
+        'items.*.product_id' => 'required_if:items.*.type,existing|exists:products,id',
+        'items.*.quantity' => 'required|numeric|min:0.01',
+        'items.*.unit_cost' => 'required|numeric|min:0',
+        'items.*.selling_price' => 'nullable|numeric|min:0',
+        'items.*.barcode' => 'nullable|string',
+        'items.*.sku' => 'nullable|string',
+        'items.*.name' => 'required_if:items.*.type,new|string|max:255',
+        'items.*.category_id' => 'nullable|exists:categories,id',
+        'items.*.unit' => 'nullable|string|max:50',
+        'items.*.description' => 'nullable|string',
+    ]);
+    
+    try {
+        DB::beginTransaction();
+        
+        $transactions = [];
+        $newProducts = [];
+        
+        foreach ($validated['items'] as $item) {
+            if ($item['type'] === 'new') {
+                // Create new product
+                $product = Product::create([
+                    'name' => $item['name'],
+                    'sku' => $item['sku'] ?? Product::generateSku(),
+                    'barcode' => $item['barcode'] ?? null,
+                    'category_id' => $item['category_id'] ?? null,
+                    'cost_price' => $item['unit_cost'],
+                    'selling_price' => $item['selling_price'] ?? ($item['unit_cost'] * 1.3), // 30% markup by default
+                    'stock_quantity' => 0, // Will be updated by transaction
+                    'low_stock_threshold' => 10,
+                    'unit' => $item['unit'] ?? 'pcs',
+                    'description' => $item['description'] ?? null,
+                    'is_active' => true,
+                    'is_taxable' => true,
+                ]);
+                
+                $newProducts[] = $product;
+                $productId = $product->id;
+            } else {
+                $productId = $item['product_id'];
+                $product = Product::find($productId);
+                
+                // Update product cost price if needed
+                if ($item['unit_cost'] > 0) {
+                    $product->cost_price = $item['unit_cost'];
+                    $product->save();
+                }
+            }
+            
+            // Create inventory transaction
+            $transactionData = [
+                'product_id' => $productId,
+                'transaction_type' => InventoryTransaction::TYPE_PURCHASE,
+                'quantity' => $item['quantity'],
+                'unit_cost' => $item['unit_cost'],
+                'total_cost' => $item['quantity'] * $item['unit_cost'],
+                'warehouse_id' => $validated['warehouse_id'],
+                'user_id' => auth()->id(),
+                'reference_number' => $validated['reference_number'] ?? 'PUR-' . date('Ymd-His'),
+                'notes' => "Purchase from supplier" . 
+                          ($validated['supplier_id'] ? " #" . $validated['supplier_id'] : "") .
+                          ($validated['notes'] ? "\n{$validated['notes']}" : ''),
+                'metadata' => [
+                    'supplier_id' => $validated['supplier_id'],
+                    'invoice_number' => $validated['invoice_number'],
+                    'payment_method' => $validated['payment_method'],
+                ],
+            ];
+            
+            $transaction = $this->inventoryService->processTransaction($transactionData);
+            $transactions[] = $transaction;
+        }
+        
+        DB::commit();
+        
+        return response()->json([
+            'success' => true,
+            'message' => count($transactions) . ' item(s) received successfully',
+            'transactions' => $transactions,
+            'new_products' => $newProducts,
+        ]);
+        
+    } catch (\Exception $e) {
+        DB::rollBack();
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Error receiving goods: ' . $e->getMessage(),
+        ], 500);
+    }
+}
+
+// Also add this helper method to Product model
+public static function generateSku()
+{
+    $prefix = 'PROD';
+    $random = strtoupper(substr(md5(microtime()), 0, 6));
+    return $prefix . '-' . $random;
+}
 }

@@ -26,10 +26,45 @@ class SaleController extends Controller
     /**
      * Display POS interface
      */
-  public function pos()
-{
-    // Get products with inventory information
-    $products = Product::active()
+//   public function pos()
+// {
+//     // Get products with inventory information
+//     $products = Product::active()
+//         ->with(['category', 'inventoryLevels' => function($query) {
+//             $query->where('warehouse_id', Warehouse::getDefault()?->id);
+//         }])
+//         ->get()
+//         ->map(function($product) {
+//             return [
+//                 'id' => $product->id,
+//                 'name' => $product->name,
+//                 'sku' => $product->sku,
+//                 'barcode' => $product->barcode,
+//                 'selling_price' => $product->selling_price,
+//                 'cost_price' => $product->cost_price,
+//                 'available_stock' => $product->inventoryLevels->sum('quantity_available'),
+//                 'unit' => $product->unit,
+//                 'is_taxable' => $product->is_taxable,
+//                 'category' => $product->category,
+//                 'image' => $product->images ? json_decode($product->images)[0] ?? null : null,
+//             ];
+//         });
+    
+//     return Inertia::render('Sales/Pos', [
+//         'customers' => Customer::orderBy('name')->get(['id', 'name', 'phone', 'email']),
+//         'paymentMethods' => Sale::getPaymentMethods(),
+//         'defaultWarehouse' => Warehouse::getDefault(),
+//         'taxRate' => config('app.tax_rate', 16),
+//         'products' => $products, // Add this line
+//     ]);
+// }
+        public function pos()
+    {
+        // Get default warehouse
+        $defaultWarehouse = Warehouse::getDefault();
+        $warehouseId = $defaultWarehouse?->id;
+        
+      $products = Product::active()
         ->with(['category', 'inventoryLevels' => function($query) {
             $query->where('warehouse_id', Warehouse::getDefault()?->id);
         }])
@@ -49,16 +84,157 @@ class SaleController extends Controller
                 'image' => $product->images ? json_decode($product->images)[0] ?? null : null,
             ];
         });
+        return Inertia::render('Sales/Pos', [
+            'customers' => Customer::orderBy('name')->get(['id', 'name', 'phone', 'email']),
+            'paymentMethods' => Sale::getPaymentMethods(),
+            'defaultWarehouse' => $defaultWarehouse,
+            'taxRate' => config('app.tax_rate', 16),
+            'products' => $products,
+        ]);
+    }
     
-    return Inertia::render('Sales/Pos', [
-        'customers' => Customer::orderBy('name')->get(['id', 'name', 'phone', 'email']),
-        'paymentMethods' => Sale::getPaymentMethods(),
-        'defaultWarehouse' => Warehouse::getDefault(),
-        'taxRate' => config('app.tax_rate', 16),
-        'products' => $products, // Add this line
-    ]);
-}
-    
+    /**
+     * Process a new sale - Regular form submission
+     */
+    public function processSale(Request $request)
+    {
+        $validated = $request->validate([
+            'customer_id' => 'nullable|exists:customers,id',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|numeric|min:1',
+            'items.*.price' => 'nullable|numeric|min:0',
+            'subtotal' => 'required|numeric|min:0',
+            'tax_amount' => 'nullable|numeric|min:0',
+            'discount_amount' => 'nullable|numeric|min:0',
+            'total_amount' => 'required|numeric|min:0',
+            'amount_paid' => 'required|numeric|min:0',
+            'change_amount' => 'nullable|numeric|min:0',
+            'payment_method' => 'required|string',
+            'notes' => 'nullable|string',
+            'warehouse_id' => 'nullable|exists:warehouses,id',
+        ]);
+        
+        try {
+            DB::beginTransaction();
+            
+            // Generate invoice number
+            $invoiceNumber = Sale::generateInvoiceNumber();
+            
+            // Create sale
+            $sale = Sale::create([
+                'invoice_number' => $invoiceNumber,
+                'customer_id' => $validated['customer_id'] ?? null,
+                'user_id' => auth()->id(),
+                'subtotal' => $validated['subtotal'],
+                'tax_amount' => $validated['tax_amount'] ?? 0,
+                'discount_amount' => $validated['discount_amount'] ?? 0,
+                'total_amount' => $validated['total_amount'],
+                'amount_paid' => $validated['amount_paid'],
+                'change_amount' => $validated['change_amount'] ?? 0,
+                'payment_method' => $validated['payment_method'],
+                'notes' => $validated['notes'] ?? null,
+                'is_completed' => true,
+            ]);
+            
+            // Add sale items and update inventory
+            foreach ($validated['items'] as $item) {
+                $product = Product::find($item['product_id']);
+                
+                // Check stock availability
+                if ($validated['warehouse_id']) {
+                    $inventoryLevel = InventoryLevel::where('product_id', $product->id)
+                        ->where('warehouse_id', $validated['warehouse_id'])
+                        ->first();
+                    
+                    if (!$inventoryLevel || $inventoryLevel->quantity_available < $item['quantity']) {
+                        return back()->with('error', "Insufficient stock for {$product->name}");
+                    }
+                }
+                
+                // Create sale item
+                $saleItem = SaleItem::create([
+                    'sale_id' => $sale->id,
+                    'product_id' => $product->id,
+                    'quantity' => $item['quantity'],
+                    'unit_price' => $item['price'] ?? $product->selling_price,
+                    'total_price' => ($item['price'] ?? $product->selling_price) * $item['quantity'],
+                    'cost_price' => $product->cost_price,
+                ]);
+                
+                // Update inventory if warehouse specified
+                if ($validated['warehouse_id']) {
+                    // Create inventory transaction
+                    InventoryTransaction::create([
+                        'product_id' => $product->id,
+                        'transaction_type' => InventoryTransaction::TYPE_SALE,
+                        'quantity' => $item['quantity'],
+                        'unit_cost' => $product->cost_price,
+                        'total_cost' => $item['quantity'] * $product->cost_price,
+                        'warehouse_id' => $validated['warehouse_id'],
+                        'user_id' => auth()->id(),
+                        'reference_number' => $invoiceNumber,
+                        'notes' => "POS Sale #{$invoiceNumber}",
+                        'metadata' => [
+                            'sale_id' => $sale->id,
+                            'sale_item_id' => $saleItem->id,
+                        ],
+                    ]);
+                    
+                    // Update inventory level
+                    if ($inventoryLevel) {
+                        $inventoryLevel->decreaseOnHand($item['quantity']);
+                    }
+                }
+            }
+            
+            // Create payment record
+            if ($validated['amount_paid'] > 0) {
+                Payment::create([
+                    'sale_id' => $sale->id,
+                    'customer_id' => $validated['customer_id'] ?? null,
+                    'payment_date' => now(),
+                    'amount' => $validated['amount_paid'],
+                    'payment_method' => $validated['payment_method'],
+                    'reference_number' => $invoiceNumber,
+                    'received_by' => auth()->id(),
+                ]);
+            }
+            
+            // Update customer stats if customer exists
+            if ($sale->customer) {
+                $sale->customer->updatePurchaseStats($sale);
+            }
+            
+            DB::commit();
+            
+            // Return JSON response for AJAX or redirect for form submission
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Sale completed successfully',
+                    'sale' => $sale->load(['items.product', 'customer', 'user']),
+                    'invoice_number' => $invoiceNumber,
+                    'redirect_url' => route('sales.receipt', $sale->id),
+                ]);
+            }
+            
+            return redirect()->route('sales.receipt', $sale->id)
+                ->with('success', 'Sale completed successfully!');
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Sale failed: ' . $e->getMessage(),
+                ], 500);
+            }
+            
+            return back()->with('error', 'Sale failed: ' . $e->getMessage());
+        }
+    }
     /**
      * Process a new sale
      */
@@ -266,20 +442,19 @@ public function index(Request $request)
     
     $sales = $query->paginate(50);
     
-    // Enhanced statistics
-    $today = now()->toDateString();
+    // Ensure stats are always numbers
     $stats = [
-        'today_sales' => Sale::whereDate('created_at', $today)
+        'today_sales' => (float) Sale::whereDate('created_at', now()->toDateString())
             ->completed()
-            ->sum('total_amount'),
-        'month_sales' => Sale::whereMonth('created_at', now()->month)
+            ->sum('total_amount') ?? 0.00,
+        'month_sales' => (float) Sale::whereMonth('created_at', now()->month)
             ->whereYear('created_at', now()->year)
             ->completed()
-            ->sum('total_amount'),
-        'total_sales' => Sale::completed()->count(),
-        'customers_today' => Sale::whereDate('created_at', $today)
+            ->sum('total_amount') ?? 0.00,
+        'total_sales' => (int) Sale::completed()->count() ?? 0,
+        'customers_today' => (int) Sale::whereDate('created_at', now()->toDateString())
             ->distinct('customer_id')
-            ->count('customer_id'),
+            ->count('customer_id') ?? 0,
     ];
     
     // CSV Export
@@ -287,7 +462,7 @@ public function index(Request $request)
         return $this->exportSalesToCSV($query->get());
     }
     
-    return Inertia::render('Sales/index', [
+    return Inertia::render('Sales/index', [ // Note: Changed 'index' to 'Index' (capitalized)
         'sales' => $sales,
         'filters' => $request->only(['search', 'start_date', 'end_date', 'status', 'payment_method']),
         'stats' => $stats,
@@ -350,32 +525,37 @@ private function exportSalesToCSV($sales)
     /**
      * Show sale details
      */
-    public function show(Sale $sale)
-    {
-        $sale->load(['customer', 'user', 'items.product', 'payments']);
-        
-        return Inertia::render('Sales/Show', [
-            'sale' => $sale,
-        ]);
-    }
+public function show(Sale $sale)
+{
+    // Remove 'payments' from the load since we don't have that relationship yet
+$sale->load(['customer', 'user', 'items.product', 'payments']);    
+    return Inertia::render('Sales/Show', [
+        'sale' => $sale,
+    ]);
+}
+
+/**
+ * Print receipt
+ */
+public function printReceipt($id)
+{
+    $sale = Sale::with(['customer', 'items.product', 'user'])->findOrFail($id);
+    
+    return Inertia::render('Sales/Receipt', [
+        'sale' => $sale,
+        'company' => [
+            'name' => config('app.company_name', 'Your Business'),
+            'address' => config('app.company_address', ''),
+            'phone' => config('app.company_phone', ''),
+            'email' => config('app.company_email', ''),
+        ],
+    ]);
+}
     
     /**
      * Print receipt
      */
-    public function printReceipt($id)
-    {
-        $sale = Sale::with(['customer', 'items.product', 'user'])->findOrFail($id);
-        
-        return Inertia::render('Sales/Receipt', [
-            'sale' => $sale,
-            'company' => [
-                'name' => config('app.company_name', 'Your Business'),
-                'address' => config('app.company_address', ''),
-                'phone' => config('app.company_phone', ''),
-                'email' => config('app.company_email', ''),
-            ],
-        ]);
-    }
+
     
     /**
      * Process refund/return

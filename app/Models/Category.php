@@ -37,6 +37,11 @@ class Category extends Model
     {
         return $this->hasMany(Product::class);
     }
+        // Add this scope method
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
 
     // Generate slug from name
     // protected static function boot()
